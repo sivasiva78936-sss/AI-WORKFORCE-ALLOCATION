@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en" data-theme-aware>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dispatch — AI workforce allocation agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E8EAEE;
+  --panel:#FFFFFF;
+  --panel-2:#F4F5F8;
+  --ink:#14161B;
+  --ink-2:#4A505C;
+  --ink-3:#787F8D;
+  --rule:#C8CCD4;
+  --rule-soft:#DFE2E8;
+  --blue:#22439B;
+  --blue-soft:#E4E9F6;
+  --ok:#17784A;
+  --ok-soft:#E0F0E7;
+  --warn:#9C5A00;
+  --warn-soft:#F7ECD9;
+  --breach:#AF2119;
+  --breach-soft:#F8E3E1;
+  --shadow:0 1px 0 rgba(20,22,27,.05), 0 8px 20px -14px rgba(20,22,27,.5);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111318;
+    --panel:#1A1D24;
+    --panel-2:#22262F;
+    --ink:#EDEFF3;
+    --ink-2:#AAB1BE;
+    --ink-3:#7C8492;
+    --rule:#343A46;
+    --rule-soft:#282D37;
+    --blue:#8FA9EE;
+    --blue-soft:#232C44;
+    --ok:#69C89A;
+    --ok-soft:#1B2E26;
+    --warn:#E2A952;
+    --warn-soft:#2E2618;
+    --breach:#F08A80;
+    --breach-soft:#331D1B;
+    --shadow:0 1px 0 rgba(0,0,0,.4), 0 10px 22px -16px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111318; --panel:#1A1D24; --panel-2:#22262F; --ink:#EDEFF3; --ink-2:#AAB1BE;
+  --ink-3:#7C8492; --rule:#343A46; --rule-soft:#282D37; --blue:#8FA9EE; --blue-soft:#232C44;
+  --ok:#69C89A; --ok-soft:#1B2E26; --warn:#E2A952; --warn-soft:#2E2618;
+  --breach:#F08A80; --breach-soft:#331D1B;
+  --shadow:0 1px 0 rgba(0,0,0,.4), 0 10px 22px -16px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;margin:0;letter-spacing:.005em}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit}
+input,select{font:inherit;color:inherit}
+img{max-width:100%}
+
+/* ---------- shell ---------- */
+.wrap{max-width:1500px;margin:0 auto;padding:18px}
+header.board-head{
+  background:var(--panel); border:1px solid var(--rule); border-radius:3px;
+  box-shadow:var(--shadow); overflow:hidden; margin-bottom:16px;
+}
+.head-top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;padding:16px 18px 14px}
+.title-block h1{font-size:25px;font-weight:700;line-height:1.1}
+.title-block p{margin:4px 0 0;color:var(--ink-2);max-width:62ch;font-size:13px}
+.clock{
+  display:flex;align-items:baseline;gap:10px;
+}
+.clock .t{font-size:30px;font-weight:600;line-height:1;letter-spacing:-.01em}
+.clock .d{color:var(--ink-3);font-size:12px}
+.metrics{display:flex;flex-wrap:wrap;border-top:1px solid var(--rule-soft);background:var(--panel-2)}
+.metric{flex:1 1 130px;padding:10px 18px;border-right:1px solid var(--rule-soft)}
+.metric:last-child{border-right:0}
+.metric .v{font-size:21px;font-weight:600;line-height:1.1}
+.metric .k{font-size:11.5px;color:var(--ink-3);margin-top:1px}
+.metric.sig-warn .v{color:var(--warn)}
+.metric.sig-breach .v{color:var(--breach)}
+
+.grid{display:grid;grid-template-columns:302px minmax(0,1fr) 316px;gap:16px;align-items:start}
+@media (max-width:1180px){.grid{grid-template-columns:280px minmax(0,1fr)}.col-log{grid-column:1/-1}}
+@media (max-width:840px){.grid{grid-template-columns:1fr}.col-roster,.col-log{grid-column:auto}}
+
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:3px;box-shadow:var(--shadow);margin-bottom:16px}
+.panel > h2{
+  font-size:14px;font-weight:700;padding:10px 14px;border-bottom:1px solid var(--rule-soft);
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.panel > h2 .count{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3);font-weight:500}
+.pad{padding:12px 14px}
+
+/* ---------- controls ---------- */
+.btn{
+  background:var(--panel); border:1px solid var(--rule); border-radius:3px;
+  padding:5px 11px; cursor:pointer; font-size:13px; font-weight:500;
+  transition:background .12s ease, border-color .12s ease;
+}
+.btn:hover{background:var(--panel-2)}
+.btn:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+:root[data-theme="dark"] .btn.primary,
+:root:not([data-theme="light"]) .btn.primary{color:#0E1118}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .btn.primary{color:#fff}}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.tiny{padding:2px 7px;font-size:12px}
+.btn.danger{color:var(--breach);border-color:var(--rule)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+label.field{display:block;margin-bottom:9px}
+label.field > span{display:block;font-size:12px;color:var(--ink-2);margin-bottom:3px}
+input[type=text],input[type=number],select{
+  width:100%;background:var(--panel-2);border:1px solid var(--rule);border-radius:3px;
+  padding:6px 8px;
+}
+input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px;border-color:var(--blue)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{
+  border:1px solid var(--rule);border-radius:2px;padding:2px 7px;font-size:11.5px;
+  background:var(--panel-2);color:var(--ink-2);cursor:pointer;
+  font-family:"IBM Plex Mono",monospace;
+}
+.chip[aria-pressed="true"]{background:var(--blue-soft);border-color:var(--blue);color:var(--blue);font-weight:500}
+.chip.static{cursor:default}
+.chip.miss{border-style:dashed;opacity:.65;text-decoration:line-through}
+
+/* ---------- roster ---------- */
+.emp{border-bottom:1px solid var(--rule-soft);padding:11px 14px}
+.emp:last-child{border-bottom:0}
+.emp.off{background:var(--panel-2)}
+.emp-head{display:flex;gap:9px;align-items:flex-start}
+.badge{
+  width:30px;height:30px;flex:none;border-radius:2px;display:grid;place-items:center;
+  font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;
+  background:var(--blue-soft);color:var(--blue);border:1px solid var(--rule);
+}
+.emp.off .badge{background:var(--panel);color:var(--ink-3)}
+.emp-name{font-weight:600;font-size:13.5px}
+.emp-sub{font-size:12px;color:var(--ink-3)}
+.load{margin-top:8px}
+.load-bar{height:7px;background:var(--panel-2);border:1px solid var(--rule-soft);border-radius:2px;overflow:hidden;position:relative}
+.load-fill{height:100%;background:var(--blue);transition:width .35s cubic-bezier(.4,0,.2,1)}
+.load-fill.hot{background:var(--warn)}
+.load-fill.over{background:var(--breach)}
+.load-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-3);margin-top:3px}
+.switch{display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;user-select:none}
+.switch input{accent-color:var(--blue)}
+
+/* ---------- tasks ---------- */
+.task{border-bottom:1px solid var(--rule-soft);padding:12px 14px}
+.task:last-child{border-bottom:0}
+.task.done{opacity:.55}
+.task-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.task-title{font-weight:600;font-size:14px;line-height:1.3}
+.task-id{font-size:11px;color:var(--ink-3);font-family:"IBM Plex Mono",monospace}
+.sla{
+  flex:none;text-align:right;border-left:3px solid var(--ok);padding-left:9px;min-width:104px;
+}
+.sla.risk{border-left-color:var(--warn)}
+.sla.breach{border-left-color:var(--breach)}
+.sla .cd{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600;line-height:1.2;color:var(--ok)}
+.sla.risk .cd{color:var(--warn)} .sla.breach .cd{color:var(--breach)}
+.sla .lb{font-size:11px;color:var(--ink-3)}
+.meta-line{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--ink-2);margin-top:6px;align-items:center}
+.urg{display:inline-flex;gap:2px;align-items:center}
+.urg i{width:5px;height:11px;background:var(--rule);display:block;border-radius:1px}
+.urg i.on{background:var(--blue)}
+.urg.hi i.on{background:var(--breach)}
+.assign{
+  margin-top:9px;background:var(--panel-2);border:1px solid var(--rule-soft);border-radius:3px;
+  padding:8px 10px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+}
+.assign.none{background:transparent;border-style:dashed;color:var(--ink-3)}
+.assign-who{display:flex;align-items:center;gap:8px}
+.score{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2)}
+.why{margin-top:9px;border:1px solid var(--rule-soft);border-radius:3px;padding:10px 11px;background:var(--panel-2)}
+.why h4{margin:0 0 8px;font-size:12.5px;font-weight:600}
+.fac{display:grid;grid-template-columns:118px 1fr 44px;gap:8px;align-items:center;margin-bottom:5px;font-size:12px}
+.fac .track{height:6px;background:var(--rule-soft);border-radius:2px;overflow:hidden}
+.fac .fill{height:100%;background:var(--blue)}
+.fac .fill.low{background:var(--warn)}
+.fac .fill.bad{background:var(--breach)}
+.fac .num{font-family:"IBM Plex Mono",monospace;text-align:right;color:var(--ink-2)}
+.fac .w{color:var(--ink-3);font-size:11px}
+.ai-out{margin-top:9px;border-top:1px solid var(--rule-soft);padding-top:8px;font-size:12.5px;color:var(--ink-2);white-space:pre-wrap}
+
+.empty{padding:26px 16px;text-align:center;color:var(--ink-2)}
+.empty p{margin:0 0 12px;max-width:44ch;margin-inline:auto}
+
+/* ---------- log ---------- */
+.log-item{display:flex;gap:9px;padding:8px 14px;border-bottom:1px solid var(--rule-soft);font-size:12.5px}
+.log-item:last-child{border-bottom:0}
+.log-t{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3);flex:none;padding-top:1px}
+.log-b{min-width:0}
+.log-k{font-size:10.5px;font-weight:600;letter-spacing:.02em;padding:1px 5px;border-radius:2px;display:inline-block;margin-bottom:2px}
+.k-assign{background:var(--blue-soft);color:var(--blue)}
+.k-realloc{background:var(--warn-soft);color:var(--warn)}
+.k-breach{background:var(--breach-soft);color:var(--breach)}
+.k-done{background:var(--ok-soft);color:var(--ok)}
+.k-sys{background:var(--panel-2);color:var(--ink-3)}
+.log-scroll{max-height:420px;overflow-y:auto}
+
+.agent-out{
+  background:var(--panel-2);border:1px solid var(--rule-soft);border-radius:3px;padding:10px;
+  font-size:12.5px;white-space:pre-wrap;color:var(--ink-2);max-height:240px;overflow:auto;margin-top:9px;
+}
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0}
+.tier{padding:11px 14px;border-right:1px solid var(--rule-soft)}
+.tier:last-child{border-right:0}
+.tier b{font-size:12.5px}
+.tier p{margin:3px 0 0;font-size:12px;color:var(--ink-3)}
+.note{font-size:12px;color:var(--ink-3)}
+.scroll-x{overflow-x:auto}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--rule);border-radius:4px}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="board-head">
+  <div class="head-top">
+    <div class="title-block">
+      <h1>Dispatch</h1>
+      <p>An allocation agent that assigns people to work, then keeps re-deciding as workloads, priorities and availability shift. Every assignment below is scored, logged and reversible.</p>
+    </div>
+    <div class="clock">
+      <div>
+        <div class="t mono" id="clockT">--:--:--</div>
+        <div class="d" id="clockD">board clock</div>
+      </div>
+      <select id="rate" style="width:auto" title="Run the board faster to watch SLA pressure build">
+        <option value="1">1× real time</option>
+        <option value="60">60× — 1 min = 1 hr</option>
+        <option value="300">300× — 12 s = 1 hr</option>
+      </select>
+    </div>
+  </div>
+  <div class="metrics" id="metrics"></div>
+</header>
+
+<div class="grid">
+
+  <!-- ROSTER -->
+  <div class="col-roster">
+    <section class="panel">
+      <h2>Roster <span class="count" id="rosterCount"></span></h2>
+      <div id="roster"></div>
+      <div class="pad" style="border-top:1px solid var(--rule-soft)">
+        <button class="btn" id="toggleEmpForm">Add a person</button>
+      </div>
+      <div class="pad" id="empForm" hidden style="border-top:1px solid var(--rule-soft);background:var(--panel-2)">
+        <label class="field"><span>Name</span><input type="text" id="eName" placeholder="Divya Ramesh"></label>
+        <label class="field"><span>Role</span><input type="text" id="eRole" placeholder="Network engineer"></label>
+        <div class="row" style="gap:8px">
+          <label class="field" style="flex:1"><span>Location</span><select id="eLoc"></select></label>
+          <label class="field" style="width:88px"><span>Capacity (h)</span><input type="number" id="eCap" value="8" min="1" max="16"></label>
+        </div>
+        <label class="field"><span>Historical performance (0–100)</span><input type="number" id="ePerf" value="80" min="0" max="100"></label>
+        <label class="field"><span>Skills</span></label>
+        <div class="chips" id="eSkills"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="saveEmp">Add to roster</button>
+          <button class="btn" id="cancelEmp">Cancel</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- TASKS -->
+  <div class="col-tasks">
+    <section class="panel">
+      <h2>Work queue <span class="count" id="taskCount"></span></h2>
+      <div class="pad" style="border-bottom:1px solid var(--rule-soft);background:var(--panel-2)">
+        <div class="row">
+          <button class="btn primary" id="toggleTaskForm">Add a task</button>
+          <button class="btn" id="runNow" title="Force the engine to re-decide right now">Re-run allocation</button>
+          <span class="note" id="engineNote"></span>
+        </div>
+      </div>
+      <div class="pad" id="taskForm" hidden style="border-bottom:1px solid var(--rule-soft);background:var(--panel-2)">
+        <label class="field"><span>What needs doing</span><input type="text" id="tTitle" placeholder="Restore fibre link at Peelamedu node"></label>
+        <div class="row" style="gap:8px">
+          <label class="field" style="flex:1"><span>Location</span><select id="tLoc"></select></label>
+          <label class="field" style="width:96px"><span>Effort (h)</span><input type="number" id="tEffort" value="3" min="1" max="24" step="0.5"></label>
+          <label class="field" style="width:96px"><span>SLA (h)</span><input type="number" id="tSla" value="6" min="1" max="72" step="1"></label>
+        </div>
+        <label class="field"><span>Urgency</span>
+          <select id="tUrg">
+            <option value="1">1 — routine</option>
+            <option value="2">2 — scheduled</option>
+            <option value="3" selected>3 — elevated</option>
+            <option value="4">4 — high</option>
+            <option value="5">5 — critical</option>
+          </select>
+        </label>
+        <label class="switch" style="margin-bottom:9px"><input type="checkbox" id="tRemote"> Can be done remotely</label>
+        <label class="field"><span>Skills required</span></label>
+        <div class="chips" id="tSkills"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="saveTask">Queue task</button>
+          <button class="btn" id="cancelTask">Cancel</button>
+        </div>
+      </div>
+      <div id="tasks"></div>
+    </section>
+
+    <section class="panel">
+      <h2>How the agent decides</h2>
+      <div class="pad" id="factorLegend"></div>
+    </section>
+  </div>
+
+  <!-- LOG + AGENT -->
+  <div class="col-log">
+    <section class="panel">
+      <h2>Decision log <span class="count" id="logCount"></span></h2>
+      <div class="log-scroll" id="log"></div>
+    </section>
+
+    <section class="panel" id="agentPanel" hidden>
+      <h2>Ask the agent</h2>
+      <div class="pad">
+        <p class="note" style="margin:0 0 9px">Claude reads the live board and answers about staffing, risk and trade-offs.</p>
+        <input type="text" id="agentQ" placeholder="Who is at risk of missing SLA and why?">
+        <div class="row" style="margin-top:9px">
+          <button class="btn primary" id="agentGo">Ask</button>
+          <button class="btn" id="agentBrief">Shift handover brief</button>
+        </div>
+        <div class="agent-out" id="agentOut" hidden></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<section class="panel" style="margin-top:0">
+  <h2>What is running underneath</h2>
+  <div class="tiers">
+    <div class="tier"><b>Front end</b><p>This page. Renders the board and pushes every operator action straight into the store.</p></div>
+    <div class="tier"><b>Allocation engine</b><p>Scores every person against every open task, re-runs on a timer and after each change, and holds a single-writer lease so only one browser decides at a time.</p></div>
+    <div class="tier"><b>Database</b><p>A shared document store: people, tasks, the decision log and the board clock. Open this link in two windows and both stay in sync.</p></div>
+    <div class="tier"><b>Reasoning</b><p>Claude explains any individual assignment and answers questions about the floor, using the live board as its input.</p></div>
+  </div>
+</section>
+
+<p class="note" style="text-align:center;margin:14px 0 30px">Demo board. Data here is shared with anyone you give this link to.</p>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   0. CONSTANTS
+   ============================================================ */
+const HOUR = 3600000;
+const SKILLS = ["Network","Linux","Windows","Database","Security","Cloud","Frontend","Backend","Hardware","Telecom","Billing","Escalation"];
+const LOCATIONS = ["Coimbatore","Chennai","Bengaluru","Hyderabad","Remote"];
+const FACTORS = [
+  {k:"skill",       label:"Skill match",      blurb:"Does this person hold the skills the task lists?"},
+  {k:"workload",    label:"Current workload", blurb:"How much of their day is still free."},
+  {k:"sla",         label:"SLA headroom",     blurb:"Would they finish before the commitment expires, queue included?"},
+  {k:"availability",label:"Availability",     blurb:"On shift, and not already full."},
+  {k:"location",    label:"Location",         blurb:"On site, nearby, or remote-eligible."},
+  {k:"performance", label:"Past performance", blurb:"Historical success rate on comparable work."}
+];
+const TID = "t" + Math.random().toString(36).slice(2,10);
+
+/* ============================================================
+   1. STATE
+   ============================================================ */
+const state = {
+  employees:new Map(),
+  tasks:new Map(),
+  log:[],
+  clock:{rate:1, anchorReal:Date.now(), anchorSim:Date.now()},
+  open:new Set(),        // task ids with the "why" panel open
+  ai:new Map(),          // task id -> explanation text
+  seq:0
+};
+let db = null, sample = null, isEngine = false, lastReconcile = 0;
+
+const $ = s=>document.querySelector(s);
+const el = (t,c,x)=>{const n=document.createElement(t); if(c)n.className=c; if(x!=null)n.textContent=x; return n;};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const uid = p => p + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2,5);
+
+/* ============================================================
+   2. CLOCK  (a shared, optionally accelerated board clock)
+   ============================================================ */
+function simNow(){
+  const c = state.clock;
+  return c.anchorSim + (Date.now() - c.anchorReal) * c.rate;
+}
+function fmtClock(ms){
+  const d = new Date(ms);
+  return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+":"+String(d.getSeconds()).padStart(2,"0");
+}
+function fmtDur(ms){
+  const neg = ms < 0; ms = Math.abs(ms);
+  const h = Math.floor(ms/HOUR), m = Math.floor(ms%HOUR/60000), s = Math.floor(ms%60000/1000);
+  const core = h>0 ? h+"h "+String(m).padStart(2,"0")+"m" : m+"m "+String(s).padStart(2,"0")+"s";
+  return (neg?"-":"") + core;
+}
+
+/* ============================================================
+   3. STORE  — database layer with an in-memory fallback
+   ============================================================ */
+const queues = new Map();
+function enqueue(path, fn){
+  const prev = queues.get(path) || Promise.resolve();
+  const next = prev.then(fn, fn).catch(e=>console.warn("write failed", path, e && e.code));
+  queues.set(path, next);
+  return next;
+}
+const store = {
+  saveEmployee(e){
+    state.employees.set(e.id, e);
+    if(db) return enqueue("employees/"+e.id, ()=>db.doc("employees/"+e.id).set(e));
+    render(); return Promise.resolve();
+  },
+  removeEmployee(id){
+    state.employees.delete(id);
+    if(db) return enqueue("employees/"+id, ()=>db.doc("employees/"+id).delete());
+    render(); return Promise.resolve();
+  },
+  saveTask(t){
+    state.tasks.set(t.id, t);
+    if(db) return enqueue("tasks/"+t.id, ()=>db.doc("tasks/"+t.id).set(t));
+    render(); return Promise.resolve();
+  },
+  removeTask(id){
+    state.tasks.delete(id);
+    if(db) return enqueue("tasks/"+id, ()=>db.doc("tasks/"+id).delete());
+    render(); return Promise.resolve();
+  },
+  saveClock(c){
+    state.clock = c;
+    if(db) return enqueue("system/clock", ()=>db.doc("system/clock").set(c));
+    render(); return Promise.resolve();
+  },
+  log(kind, text){
+    const entry = {t:simNow(), kind, text, n:(++state.seq)};
+    state.log.unshift(entry);
+    if(state.log.length > 70) state.log.length = 70;
+    if(db) return enqueue("system/log", ()=>db.doc("system/log").set({entries:state.log.slice(0,70)}));
+    renderLog(); return Promise.resolve();
+  }
+};
+
+/* ============================================================
+   4. ALLOCATION ENGINE  — the "backend" decision logic
+   ============================================================ */
+function activeTasksOf(empId){
+  const out=[];
+  state.tasks.forEach(t=>{ if(t.assignee===empId && (t.status==="assigned"||t.status==="in_progress")) out.push(t); });
+  return out;
+}
+function loadHours(empId){
+  return activeTasksOf(empId).reduce((a,t)=>a + (t.status==="in_progress" ? t.effort*0.6 : t.effort), 0);
+}
+function weightsFor(urgency){
+  const t = clamp((urgency-1)/4, 0, 1);
+  const w = {
+    skill:        0.30,
+    sla:          0.12 + 0.18*t,
+    performance:  0.12 + 0.10*t,
+    workload:     0.22 - 0.10*t,
+    availability: 0.12 - 0.04*t,
+    location:     0.12 - 0.08*t
+  };
+  const sum = Object.values(w).reduce((a,b)=>a+b,0);
+  Object.keys(w).forEach(k=>w[k]=w[k]/sum);
+  return w;
+}
+function slaState(task, now){
+  if(task.status==="done") return "ok";
+  const remaining = task.due - now;
+  if(remaining <= 0) return "breach";
+  const work = task.effort * HOUR;
+  return remaining < work * 1.35 ? "risk" : "ok";
+}
+function scoreFor(emp, task, now){
+  if(!emp) return null;
+  const req = task.skills || [];
+  const have = req.filter(s=>emp.skills.includes(s)).length;
+  const fSkill = req.length ? have/req.length : 0.75;
+  if(fSkill === 0) return null;                       // hard gate: no relevant skill at all
+
+  const speed = 0.7 + (emp.performance/100) * 0.6;    // performance drives throughput
+  const load = loadHours(emp.id) - (task.assignee===emp.id ? task.effort : 0);
+  const headroom = emp.capacity - load;
+  const fWorkload = clamp(headroom / emp.capacity, 0, 1);
+
+  const finish = now + (Math.max(0,load)/speed)*HOUR + (task.effort/speed)*HOUR;
+  const window = Math.max(HOUR*0.25, task.due - now);
+  const fSla = clamp((task.due - finish) / window, 0, 1);
+
+  const fAvail = !emp.available ? 0 : (headroom > 0 ? 1 : 0.3);
+  if(fAvail === 0) return null;                       // hard gate: off shift
+
+  const fLoc = task.location === emp.location ? 1
+             : task.remoteOk ? 0.82
+             : (emp.location === "Remote" || task.location === "Remote") ? 0.55
+             : 0.38;
+
+  const fPerf = emp.performance/100;
+
+  const w = weightsFor(task.urgency);
+  const f = {skill:fSkill, workload:fWorkload, sla:fSla, availability:fAvail, location:fLoc, performance:fPerf};
+  let total = 0; for(const k in w) total += w[k]*f[k];
+  return {total, f, w, finish, empId:emp.id};
+}
+function bestFor(task, now, exclude){
+  let best = null;
+  state.employees.forEach(emp=>{
+    if(exclude && exclude.has(emp.id)) return;
+    const s = scoreFor(emp, task, now);
+    if(s && (!best || s.total > best.total)) best = s;
+  });
+  return best;
+}
+function priorityOf(task, now){
+  const pressure = clamp(1 - (task.due - now) / Math.max(HOUR, task.window || HOUR*8), 0, 1.6);
+  return task.urgency * 2 + pressure * 3.2;
+}
+
+/** The reconcile pass: the dynamic part of the brief. */
+async function reconcile(reason){
+  const now = simNow();
+  const writes = [];
+
+  // (a) Newly unavailable or deleted people: pull their work back.
+  state.tasks.forEach(t=>{
+    if(!t.assignee || t.status==="done") return;
+    const emp = state.employees.get(t.assignee);
+    if(!emp || !emp.available){
+      const who = emp ? emp.name : "A removed team member";
+      store.log("realloc", who + " went unavailable. " + t.title + " returned to the queue.");
+      t.assignee = null; t.status = "pending"; t.score = null; t.breakdown = null;
+      writes.push(t);
+    }
+  });
+
+  // (b) SLA breaches worth recording once.
+  state.tasks.forEach(t=>{
+    if(t.status==="done" || t.breachLogged) return;
+    if(now > t.due){
+      t.breachLogged = true;
+      store.log("breach", "SLA expired on " + t.title + (t.assignee ? " (held by " + nameOf(t.assignee) + ")" : " while unassigned"));
+      if(writes.indexOf(t) < 0) writes.push(t);
+    }
+  });
+
+  // (c) Assign and re-assign open work, highest pressure first.
+  const open = [];
+  state.tasks.forEach(t=>{ if(t.status==="pending"||t.status==="assigned") open.push(t); });
+  open.sort((a,b)=>priorityOf(b,now)-priorityOf(a,now));
+
+  for(const t of open){
+    const best = bestFor(t, now);
+
+    if(!t.assignee){
+      if(!best){
+        if(!t.starvedLogged){
+          t.starvedLogged = true;
+          store.log("realloc", "No one on shift matches " + t.title + ". Holding in the queue.");
+          if(writes.indexOf(t)<0) writes.push(t);
+        }
+        continue;
+      }
+      t.starvedLogged = false;
+      t.assignee = best.empId; t.status = "assigned"; t.score = best.total; t.breakdown = best.f; t.weights = best.w;
+      t.assignedAt = now;
+      store.log("assign", nameOf(best.empId) + " picked up " + t.title + " (match " + pct(best.total) + ")");
+      if(writes.indexOf(t)<0) writes.push(t);
+      continue;
+    }
+
+    // Already assigned — only disturb it if the commitment is in danger or priority moved.
+    const st = slaState(t, now);
+    const disturb = st !== "ok" || t.dirty;
+    if(!disturb) continue;
+
+    const cur = scoreFor(state.employees.get(t.assignee), t, now);
+    const curTotal = cur ? cur.total : 0;
+    if(best && best.empId !== t.assignee && best.total - curTotal > 0.10){
+      const from = nameOf(t.assignee);
+      t.assignee = best.empId; t.score = best.total; t.breakdown = best.f; t.weights = best.w; t.dirty = false;
+      store.log("realloc", "Moved " + t.title + " from " + from + " to " + nameOf(best.empId) +
+        (st==="ok" ? " after the priority changed." : " to protect the SLA.") + " Match " + pct(curTotal) + " → " + pct(best.total));
+      if(writes.indexOf(t)<0) writes.push(t);
+    } else if(cur && (t.score == null || Math.abs(cur.total - t.score) > 0.02)){
+      t.score = cur.total; t.breakdown = cur.f; t.weights = cur.w; t.dirty = false;
+      if(writes.indexOf(t)<0) writes.push(t);
+    } else if(t.dirty){
+      t.dirty = false;
+      if(writes.indexOf(t)<0) writes.push(t);
+    }
+  }
+
+  for(const t of writes) await store.saveTask(t);
+  render();
+}
+const nameOf = id => (state.employees.get(id) || {}).name || "someone";
+const pct = v => Math.round((v||0)*100) + "%";
+
+/* ============================================================
+   5. RENDER
+   ============================================================ */
+function render(){ renderMetrics(); renderRoster(); renderTasks(); renderLog(); }
+
+function renderMetrics(){
+  const now = simNow();
+  let open=0, risk=0, breach=0, unassigned=0, done=0, cap=0, load=0, off=0;
+  state.tasks.forEach(t=>{
+    if(t.status==="done"){done++;return;}
+    open++;
+    if(!t.assignee) unassigned++;
+    const s = slaState(t, now);
+    if(s==="risk") risk++; if(s==="breach") breach++;
+  });
+  state.employees.forEach(e=>{ if(e.available){cap += e.capacity; load += Math.min(loadHours(e.id), e.capacity*1.5);} else off++; });
+  const util = cap ? Math.round(load/cap*100) : 0;
+  const m = $("#metrics"); m.innerHTML = "";
+  const add=(v,k,sig)=>{const d=el("div","metric"+(sig?" sig-"+sig:"")); d.appendChild(el("div","v mono",v)); d.appendChild(el("div","k",k)); m.appendChild(d);};
+  add(String(open), "open tasks");
+  add(String(unassigned), "waiting for a person", unassigned?"warn":"");
+  add(String(risk), "SLA at risk", risk?"warn":"");
+  add(String(breach), "SLA missed", breach?"breach":"");
+  add(util+"%", "roster utilisation", util>92?"breach":util>78?"warn":"");
+  add(String(off), "off shift");
+  add(String(done), "completed");
+}
+
+function renderRoster(){
+  const host = $("#roster"); host.innerHTML = "";
+  const list = [...state.employees.values()].sort((a,b)=>a.name.localeCompare(b.name));
+  $("#rosterCount").textContent = list.length ? list.filter(e=>e.available).length + " on shift / " + list.length : "";
+  if(!list.length){
+    const e = el("div","empty");
+    e.appendChild(el("p",null,"No one on the roster yet. Add a person, or start from a sample floor of six engineers and seven live tasks."));
+    const b = el("button","btn primary","Load a sample floor"); b.onclick = seedDemo;
+    e.appendChild(b); host.appendChild(e); return;
+  }
+  list.forEach(emp=>{
+    const load = loadHours(emp.id), ratio = emp.capacity ? load/emp.capacity : 0;
+    const d = el("div","emp"+(emp.available?"":" off"));
+    const head = el("div","emp-head");
+    head.appendChild(el("div","badge", emp.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()));
+    const who = el("div"); who.style.flex="1"; who.style.minWidth="0";
+    who.appendChild(el("div","emp-name", emp.name));
+    who.appendChild(el("div","emp-sub", emp.role + " · " + emp.location + " · " + emp.performance + " perf"));
+    head.appendChild(who);
+    const del = el("button","btn tiny danger","Remove");
+    del.title = "Remove from the roster";
+    del.onclick = ()=>{ store.removeEmployee(emp.id).then(()=>{ store.log("sys", emp.name + " left the roster."); reconcile("remove"); }); };
+    head.appendChild(del);
+    d.appendChild(head);
+
+    const chips = el("div","chips"); chips.style.marginTop="7px";
+    emp.skills.forEach(s=>chips.appendChild(el("span","chip static",s)));
+    d.appendChild(chips);
+
+    const wrap = el("div","load");
+    const bar = el("div","load-bar");
+    const fill = el("div","load-fill"+(ratio>1?" over":ratio>0.8?" hot":""));
+    fill.style.width = clamp(ratio,0,1)*100 + "%";
+    bar.appendChild(fill); wrap.appendChild(bar);
+    const meta = el("div","load-meta");
+    meta.appendChild(el("span",null, load.toFixed(1)+" of "+emp.capacity+" h booked"));
+    meta.appendChild(el("span",null, activeTasksOf(emp.id).length + " active"));
+    wrap.appendChild(meta);
+    d.appendChild(wrap);
+
+    const sw = el("label","switch"); sw.style.marginTop="8px";
+    const cb = document.createElement("input"); cb.type="checkbox"; cb.checked = emp.available;
+    cb.onchange = ()=>{
+      emp.available = cb.checked;
+      store.saveEmployee(emp).then(()=>{
+        store.log("sys", emp.name + (emp.available ? " is back on shift." : " is now unavailable."));
+        reconcile("availability");
+      });
+    };
+    sw.appendChild(cb); sw.appendChild(el("span",null, emp.available ? "On shift" : "Unavailable"));
+    d.appendChild(sw);
+    host.appendChild(d);
+  });
+}
+
+function renderTasks(){
+  const host = $("#tasks"); host.innerHTML = "";
+  const now = simNow();
+  const list = [...state.tasks.values()].sort((a,b)=>{
+    if((a.status==="done") !== (b.status==="done")) return a.status==="done" ? 1 : -1;
+    return priorityOf(b,now) - priorityOf(a,now);
+  });
+  const openCount = list.filter(t=>t.status!=="done").length;
+  $("#taskCount").textContent = list.length ? openCount + " open / " + list.length : "";
+  if(!list.length){
+    const e = el("div","empty");
+    e.appendChild(el("p",null,"Nothing queued. Add a task and the agent will pick a person the moment it lands."));
+    host.appendChild(e); return;
+  }
+  list.forEach(t=>host.appendChild(taskNode(t, now)));
+}
+
+function taskNode(t, now){
+  const st = slaState(t, now);
+  const d = el("div","task"+(t.status==="done"?" done":""));
+
+  const top = el("div","task-top");
+  const left = el("div"); left.style.minWidth="0";
+  left.appendChild(el("div","task-title", t.title));
+  const meta = el("div","meta-line");
+  const u = el("span","urg"+(t.urgency>=4?" hi":""));
+  for(let i=1;i<=5;i++){const b=el("i"); if(i<=t.urgency)b.className="on"; u.appendChild(b);}
+  meta.appendChild(u);
+  meta.appendChild(el("span",null,"urgency "+t.urgency));
+  meta.appendChild(el("span",null, t.location + (t.remoteOk ? " · remote ok" : "")));
+  meta.appendChild(el("span",null, t.effort + " h of work"));
+  meta.appendChild(el("span","task-id", t.id));
+  left.appendChild(meta);
+  const sk = el("div","chips"); sk.style.marginTop="6px";
+  const emp = t.assignee ? state.employees.get(t.assignee) : null;
+  (t.skills||[]).forEach(s=>{
+    const c = el("span","chip static"+(emp && !emp.skills.includes(s) ? " miss":""), s);
+    if(emp && !emp.skills.includes(s)) c.title = emp.name + " does not hold this skill";
+    sk.appendChild(c);
+  });
+  left.appendChild(sk);
+  top.appendChild(left);
+
+  if(t.status!=="done"){
+    const sla = el("div","sla "+(st==="ok"?"":st));
+    const cd = el("div","cd mono", fmtDur(t.due-now));
+    cd.dataset.due = String(t.due);
+    sla.appendChild(cd);
+    sla.appendChild(el("div","lb", st==="breach" ? "past SLA" : st==="risk" ? "SLA at risk" : "left on SLA"));
+    top.appendChild(sla);
+  }
+  d.appendChild(top);
+
+  // assignment strip
+  const as = el("div","assign"+(t.assignee?"":" none"));
+  const who = el("div","assign-who");
+  if(emp){
+    who.appendChild(el("div","badge", emp.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()));
+    const w2 = el("div");
+    w2.appendChild(el("div",null, emp.name));
+    w2.appendChild(el("div","score", "match " + pct(t.score) + " · " + emp.role + " · " + emp.location));
+    who.appendChild(w2);
+  } else {
+    who.appendChild(el("div",null, t.status==="done" ? "Closed" : "Waiting for a match"));
+  }
+  as.appendChild(who);
+
+  const acts = el("div","row");
+  if(t.status!=="done"){
+    const up = el("button","btn tiny","Raise priority");
+    up.disabled = t.urgency>=5;
+    up.onclick = ()=>{ t.urgency = clamp(t.urgency+1,1,5); t.dirty = true;
+      store.saveTask(t).then(()=>{ store.log("sys","Priority on " + t.title + " raised to " + t.urgency + "."); reconcile("priority"); }); };
+    const dn = el("button","btn tiny","Lower");
+    dn.disabled = t.urgency<=1;
+    dn.onclick = ()=>{ t.urgency = clamp(t.urgency-1,1,5); t.dirty = true;
+      store.saveTask(t).then(()=>{ store.log("sys","Priority on " + t.title + " lowered to " + t.urgency + "."); reconcile("priority"); }); };
+    acts.appendChild(up); acts.appendChild(dn);
+
+    if(t.assignee && t.status==="assigned"){
+      const s = el("button","btn tiny","Start");
+      s.onclick = ()=>{ t.status="in_progress"; store.saveTask(t).then(()=>{ store.log("sys", nameOf(t.assignee)+" started "+t.title+"."); render(); }); };
+      acts.appendChild(s);
+    }
+    if(t.assignee){
+      const c = el("button","btn tiny","Complete");
+      c.onclick = ()=>{
+        const closer = nameOf(t.assignee), late = simNow() > t.due;
+        t.status = "done"; t.completedAt = simNow();
+        store.saveTask(t)
+          .then(()=>store.log("done", t.title + " closed by " + closer + (late ? " after the SLA expired." : " inside SLA.")))
+          .then(()=>reconcile("complete"));
+      };
+      acts.appendChild(c);
+      const r = el("button","btn tiny","Release");
+      r.title = "Hand it back to the agent";
+      r.onclick = ()=>{ const from=nameOf(t.assignee); t.assignee=null; t.status="pending"; t.score=null; t.breakdown=null;
+        store.saveTask(t).then(()=>{ store.log("realloc", t.title + " released from " + from + "."); reconcile("release"); }); };
+      acts.appendChild(r);
+    }
+    if(t.breakdown){
+      const w = el("button","btn tiny", state.open.has(t.id) ? "Hide reasoning" : "Why this person");
+      w.onclick = ()=>{ state.open.has(t.id) ? state.open.delete(t.id) : state.open.add(t.id); render(); };
+      acts.appendChild(w);
+    }
+  }
+  const del = el("button","btn tiny danger","Delete");
+  del.onclick = ()=>store.removeTask(t.id).then(render);
+  acts.appendChild(del);
+  as.appendChild(acts);
+  d.appendChild(as);
+
+  if(state.open.has(t.id) && t.breakdown) d.appendChild(whyNode(t, now));
+  return d;
+}
+
+function whyNode(t, now){
+  const box = el("div","why");
+  box.appendChild(el("h4", null, "Score for " + nameOf(t.assignee) + " — " + pct(t.score) + " overall"));
+  const w = t.weights || weightsFor(t.urgency);
+  FACTORS.forEach(f=>{
+    const v = t.breakdown[f.k] == null ? 0 : t.breakdown[f.k];
+    const r = el("div","fac");
+    const lab = el("div");
+    lab.appendChild(document.createTextNode(f.label));
+    lab.appendChild(el("div","w","weight " + Math.round((w[f.k]||0)*100) + "%"));
+    lab.title = f.blurb;
+    r.appendChild(lab);
+    const tr = el("div","track");
+    const fi = el("div","fill"+(v<0.35?" bad":v<0.65?" low":""));
+    fi.style.width = clamp(v,0,1)*100 + "%";
+    tr.appendChild(fi); r.appendChild(tr);
+    r.appendChild(el("div","num", Math.round(v*100)));
+    box.appendChild(r);
+  });
+
+  // runners-up
+  const ranked = [];
+  state.employees.forEach(e=>{ const s = scoreFor(e,t,now); if(s && s.empId!==t.assignee) ranked.push(s); });
+  ranked.sort((a,b)=>b.total-a.total);
+  if(ranked.length){
+    const line = el("div","note"); line.style.marginTop="7px";
+    line.textContent = "Next best: " + ranked.slice(0,3).map(s=>nameOf(s.empId)+" "+pct(s.total)).join(" · ");
+    box.appendChild(line);
+  }
+
+  if(sample){
+    const b = el("button","btn tiny","Explain in plain English");
+    b.style.marginTop = "9px";
+    b.onclick = ()=>explain(t, b);
+    box.appendChild(b);
+  }
+  if(state.ai.has(t.id)) box.appendChild(el("div","ai-out", state.ai.get(t.id)));
+  return box;
+}
+
+function renderLog(){
+  const host = $("#log"); host.innerHTML = "";
+  $("#logCount").textContent = state.log.length ? state.log.length + " entries" : "";
+  if(!state.log.length){
+    host.appendChild(el("div","empty","Every assignment and re-assignment the agent makes will appear here."));
+    return;
+  }
+  state.log.forEach(e=>{
+    const d = el("div","log-item");
+    d.appendChild(el("div","log-t", fmtClock(e.t)));
+    const b = el("div","log-b");
+    const kind = e.kind==="assign"?"assigned":e.kind==="realloc"?"reallocated":e.kind==="breach"?"sla missed":e.kind==="done"?"closed":"board";
+    b.appendChild(el("span","log-k k-"+(e.kind==="sys"?"sys":e.kind), kind));
+    b.appendChild(el("div",null,e.text));
+    d.appendChild(b);
+    host.appendChild(d);
+  });
+}
+
+function renderLegend(){
+  const host = $("#factorLegend"); host.innerHTML="";
+  const p = el("p","note"); p.style.margin="0 0 10px";
+  p.textContent = "Six factors are scored for every person against every open task; the weighting shifts with urgency, so a critical job leans on SLA headroom and track record while a routine one leans on spare capacity and proximity.";
+  host.appendChild(p);
+  const g = el("div"); g.style.display="grid"; g.style.gridTemplateColumns="repeat(auto-fit,minmax(215px,1fr))"; g.style.gap="10px";
+  FACTORS.forEach(f=>{
+    const c = el("div"); c.style.borderLeft="2px solid var(--blue)"; c.style.paddingLeft="9px";
+    c.appendChild(el("div",null,f.label)).style.fontWeight="600";
+    c.appendChild(el("div","note",f.blurb));
+    g.appendChild(c);
+  });
+  ["Changing priorities","Newly unavailable people"].forEach((label,i)=>{
+    const c = el("div"); c.style.borderLeft="2px solid var(--warn)"; c.style.paddingLeft="9px";
+    c.appendChild(el("div",null,label)).style.fontWeight="600";
+    c.appendChild(el("div","note", i===0
+      ? "Raise or lower urgency and the task is re-scored against the whole roster on the next pass."
+      : "Switch someone off shift and their work returns to the queue and lands on the next best person."));
+    g.appendChild(c);
+  });
+  host.appendChild(g);
+}
+
+/* tick the countdowns without re-rendering the board */
+function tickClocks(){
+  const now = simNow();
+  $("#clockT").textContent = fmtClock(now);
+  $("#clockD").textContent = new Date(now).toDateString().slice(0,10) + (state.clock.rate>1 ? " · running "+state.clock.rate+"×" : "");
+  document.querySelectorAll(".sla .cd").forEach(n=>{
+    const due = Number(n.dataset.due);
+    n.textContent = fmtDur(due - now);
+    const box = n.parentElement;
+    const t = [...state.tasks.values()].find(x=>String(x.due)===n.dataset.due);
+    if(t){ const s = slaState(t, now); box.className = "sla " + (s==="ok"?"":s); }
+  });
+}
+
+/* ============================================================
+   6. AI REASONING
+   ============================================================ */
+function boardSnapshot(){
+  const now = simNow();
+  const people = [...state.employees.values()].map(e=>({
+    name:e.name, role:e.role, location:e.location, skills:e.skills,
+    performance:e.performance, onShift:e.available,
+    bookedHours:Number(loadHours(e.id).toFixed(1)), capacityHours:e.capacity
+  }));
+  const tasks = [...state.tasks.values()].filter(t=>t.status!=="done").map(t=>({
+    title:t.title, urgency:t.urgency, skillsRequired:t.skills, location:t.location,
+    effortHours:t.effort, slaRemaining:fmtDur(t.due-now), slaState:slaState(t,now),
+    assignedTo: t.assignee ? nameOf(t.assignee) : null, matchScore: t.score ? pct(t.score) : null
+  }));
+  return {people, tasks};
+}
+async function explain(t, btn){
+  if(!sample) return;
+  btn.disabled = true; btn.textContent = "Thinking…";
+  const now = simNow();
+  const emp = state.employees.get(t.assignee);
+  const others = [];
+  state.employees.forEach(e=>{ const s=scoreFor(e,t,now); if(s&&s.empId!==t.assignee) others.push({name:e.name, score:pct(s.total), onShift:e.available, booked:loadHours(e.id)+"/"+e.capacity+"h", skills:e.skills}); });
+  const prompt =
+    "You are the dispatcher explaining one staffing decision to an operations manager. Be concrete and brief: three or four sentences, no bullet points, no preamble.\n\n" +
+    "TASK: " + JSON.stringify({title:t.title, urgency:t.urgency, skillsRequired:t.skills, location:t.location, effortHours:t.effort, slaRemaining:fmtDur(t.due-now)}) + "\n" +
+    "CHOSEN: " + JSON.stringify({name:emp&&emp.name, role:emp&&emp.role, skills:emp&&emp.skills, location:emp&&emp.location, performance:emp&&emp.performance, booked:emp?loadHours(emp.id)+"/"+emp.capacity+"h":null}) + "\n" +
+    "FACTOR SCORES (0-1): " + JSON.stringify(t.breakdown) + "\n" +
+    "WEIGHTS USED: " + JSON.stringify(t.weights||weightsFor(t.urgency)) + "\n" +
+    "ALTERNATIVES CONSIDERED: " + JSON.stringify(others.slice(0,5)) + "\n\n" +
+    "Say why this person won, name the strongest alternative and what they lacked, and flag any risk in this choice.";
+  try{
+    const res = await sample(prompt, {modelTier:"quick", onText:({text})=>{ state.ai.set(t.id, text); render(); }});
+    state.ai.set(t.id, res.text); render();
+  }catch(e){
+    state.ai.set(t.id, e && e.code === "rate_limited" ? "Too many requests just now. Try again in a moment." : "The explanation could not be generated.");
+    render();
+  }
+}
+async function askAgent(question){
+  if(!sample) return;
+  const out = $("#agentOut"); out.hidden = false; out.textContent = "Thinking…";
+  const prompt =
+    "You are the allocation agent for a field operations team. Answer the manager's question using only the board below. " +
+    "Be specific, name people and tasks, and keep it under 140 words. No preamble.\n\n" +
+    "BOARD: " + JSON.stringify(boardSnapshot()) + "\n\nQUESTION: " + question;
+  try{
+    const res = await sample(prompt, {onText:({text})=>{ out.textContent = text; }});
+    out.textContent = res.text;
+  }catch(e){
+    out.textContent = e && e.code === "not_granted" ? "Reasoning is not available in this view."
+      : e && e.code === "rate_limited" ? "Too many requests just now. Try again in a moment."
+      : "That request did not complete. Try again.";
+  }
+}
+
+/* ============================================================
+   7. FORMS
+   ============================================================ */
+function fillSelect(sel, items){ items.forEach(v=>{const o=document.createElement("option"); o.value=v; o.textContent=v; sel.appendChild(o);}); }
+function skillPicker(host){
+  host.innerHTML = "";
+  SKILLS.forEach(s=>{
+    const b = el("button","chip",s); b.type="button"; b.setAttribute("aria-pressed","false");
+    b.onclick = ()=>b.setAttribute("aria-pressed", b.getAttribute("aria-pressed")==="true" ? "false" : "true");
+    host.appendChild(b);
+  });
+}
+const picked = host => [...host.querySelectorAll('[aria-pressed="true"]')].map(b=>b.textContent);
+
+function wireForms(){
+  fillSelect($("#eLoc"), LOCATIONS); fillSelect($("#tLoc"), LOCATIONS);
+  skillPicker($("#eSkills")); skillPicker($("#tSkills"));
+
+  $("#toggleEmpForm").onclick = ()=>{ const f=$("#empForm"); f.hidden=!f.hidden; if(!f.hidden) $("#eName").focus(); };
+  $("#cancelEmp").onclick = ()=>{ $("#empForm").hidden = true; };
+  $("#saveEmp").onclick = ()=>{
+    const name = $("#eName").value.trim();
+    if(!name){ $("#eName").focus(); return; }
+    const skills = picked($("#eSkills"));
+    if(!skills.length){ alert("Pick at least one skill so the agent can match this person to work."); return; }
+    const emp = {
+      id: uid("e"), name,
+      role: $("#eRole").value.trim() || "Engineer",
+      location: $("#eLoc").value,
+      capacity: clamp(Number($("#eCap").value)||8, 1, 16),
+      performance: clamp(Number($("#ePerf").value)||75, 0, 100),
+      skills, available: true
+    };
+    store.saveEmployee(emp).then(()=>{ store.log("sys", emp.name + " joined the roster as " + emp.role + "."); reconcile("new-person"); });
+    $("#eName").value=""; $("#eRole").value="";
+    $("#eSkills").querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+    $("#empForm").hidden = true;
+  };
+
+  $("#toggleTaskForm").onclick = ()=>{ const f=$("#taskForm"); f.hidden=!f.hidden; if(!f.hidden) $("#tTitle").focus(); };
+  $("#cancelTask").onclick = ()=>{ $("#taskForm").hidden = true; };
+  $("#saveTask").onclick = ()=>{
+    const title = $("#tTitle").value.trim();
+    if(!title){ $("#tTitle").focus(); return; }
+    const skills = picked($("#tSkills"));
+    if(!skills.length){ alert("List at least one required skill."); return; }
+    const now = simNow();
+    const slaH = clamp(Number($("#tSla").value)||6, 1, 72);
+    const t = {
+      id: uid("t"), title, skills,
+      location: $("#tLoc").value,
+      remoteOk: $("#tRemote").checked,
+      effort: clamp(Number($("#tEffort").value)||3, 0.5, 24),
+      urgency: Number($("#tUrg").value)||3,
+      due: now + slaH*HOUR, window: slaH*HOUR,
+      createdAt: now, status:"pending", assignee:null, score:null, breakdown:null
+    };
+    store.saveTask(t).then(()=>{ store.log("sys", "New task queued: " + t.title + " (SLA " + slaH + "h, urgency " + t.urgency + ")"); reconcile("new-task"); });
+    $("#tTitle").value=""; $("#tRemote").checked=false;
+    $("#tSkills").querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+    $("#taskForm").hidden = true;
+  };
+
+  $("#runNow").onclick = ()=>reconcile("manual");
+  $("#rate").onchange = ()=>{
+    const rate = Number($("#rate").value)||1;
+    store.saveClock({rate, anchorReal:Date.now(), anchorSim:simNow()}).then(()=>{
+      store.log("sys", rate===1 ? "Board clock back to real time." : "Board clock running at " + rate + "×.");
+    });
+  };
+
+  if(sample){
+    $("#agentPanel").hidden = false;
+    $("#agentGo").onclick = ()=>{ const q=$("#agentQ").value.trim(); if(q) askAgent(q); };
+    $("#agentQ").addEventListener("keydown", e=>{ if(e.key==="Enter"){ const q=e.target.value.trim(); if(q) askAgent(q); } });
+    $("#agentBrief").onclick = ()=>askAgent("Write a shift handover: what is assigned, what is at risk, and what the next shift should do first.");
+  }
+}
+
+/* ============================================================
+   8. SAMPLE FLOOR
+   ============================================================ */
+async function seedDemo(){
+  const now = simNow();
+  const people = [
+    ["Divya Ramesh","Network engineer","Coimbatore",8,92,["Network","Telecom","Hardware","Escalation"]],
+    ["Arun Prakash","Platform engineer","Bengaluru",8,86,["Linux","Cloud","Backend","Security"]],
+    ["Meera Iyer","Database engineer","Chennai",6,90,["Database","Backend","Linux"]],
+    ["Karthik Subramani","Field technician","Coimbatore",8,74,["Hardware","Network","Telecom"]],
+    ["Fatima Noor","Support specialist","Remote",7,81,["Billing","Windows","Escalation","Frontend"]],
+    ["Joel Mathew","Security analyst","Hyderabad",8,88,["Security","Cloud","Linux","Network"]]
+  ];
+  const tasks = [
+    ["Restore fibre link at Peelamedu node",["Network","Telecom"],"Coimbatore",false,4,5,3],
+    ["Failed nightly backup on billing cluster",["Database","Linux"],"Chennai",true,3,4,6],
+    ["Suspicious login burst on the VPN gateway",["Security","Network"],"Hyderabad",true,2,5,2],
+    ["Replace switch stack at the Whitefield office",["Hardware","Network"],"Bengaluru",false,5,3,10],
+    ["Invoice reconciliation errors for 40 accounts",["Billing","Database"],"Remote",true,4,2,20],
+    ["Autoscaling group stuck at minimum capacity",["Cloud","Linux"],"Bengaluru",true,2,4,4],
+    ["Customer portal login page rendering blank",["Frontend","Backend"],"Remote",true,3,4,5]
+  ];
+  for(const p of people){
+    await store.saveEmployee({id:uid("e"),name:p[0],role:p[1],location:p[2],capacity:p[3],performance:p[4],skills:p[5],available:true});
+  }
+  for(const t of tasks){
+    await store.saveTask({
+      id:uid("t"), title:t[0], skills:t[1], location:t[2], remoteOk:t[3],
+      effort:t[4], urgency:t[5], due: now + t[6]*HOUR, window:t[6]*HOUR,
+      createdAt:now, status:"pending", assignee:null, score:null, breakdown:null
+    });
+  }
+  await store.log("sys", "Sample floor loaded: " + people.length + " people, " + tasks.length + " tasks.");
+  await reconcile("seed");
+}
+
+/* ============================================================
+   9. BOOT
+   ============================================================ */
+async function boot(){
+  renderLegend();
+  render();
+  setInterval(tickClocks, 1000);
+  tickClocks();
+
+  // capabilities resolve after first paint; the board already works without them
+  try{ db = await claude.use("db"); }catch(e){ db = null; }
+  try{ sample = await claude.use("sample"); }catch(e){ sample = null; }
+  wireForms();
+
+  if(!db){
+    $("#engineNote").textContent = "Running locally — this board is not shared.";
+  } else {
+    subscribe();
+  }
+
+  // engine loop
+  setInterval(async ()=>{
+    if(db){
+      try{
+        const r = await db.doc("system/engine").acquire({holder:TID, ttlMs:14000});
+        isEngine = !!r.acquired;
+      }catch(e){ isEngine = true; }
+    } else { isEngine = true; }
+    $("#engineNote").textContent = db
+      ? (isEngine ? "Engine running in this window." : "Another window is running the engine.")
+      : "Running locally — this board is not shared.";
+    if(isEngine && Date.now() - lastReconcile > 2500){
+      lastReconcile = Date.now();
+      reconcile("tick");
+    }
+  }, 4000);
+}
+
+function subscribe(){
+  db.collection("employees").onSnapshot(s=>{
+    state.employees = new Map(s.docs.map(d=>[d.id, Object.assign({id:d.id}, d.data())]));
+    render();
+  }, e=>console.warn("employees", e.code));
+
+  db.collection("tasks").onSnapshot(s=>{
+    state.tasks = new Map(s.docs.map(d=>[d.id, Object.assign({id:d.id}, d.data())]));
+    render();
+  }, e=>console.warn("tasks", e.code));
+
+  db.doc("system/log").onSnapshot(s=>{
+    const d = s.data();
+    state.log = (d && Array.isArray(d.entries)) ? d.entries : [];
+    renderLog();
+  }, e=>console.warn("log", e.code));
+
+  db.doc("system/clock").onSnapshot(s=>{
+    const d = s.data();
+    if(d && typeof d.rate === "number"){
+      state.clock = {rate:d.rate, anchorReal:d.anchorReal, anchorSim:d.anchorSim};
+      $("#rate").value = String(d.rate);
+    }
+  }, e=>console.warn("clock", e.code));
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
